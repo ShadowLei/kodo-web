@@ -1,0 +1,382 @@
+:root {
+  --bg: #f4f6f8;
+  --panel: #ffffff;
+  --border: #e2e6ea;
+  --text: #212529;
+  --muted: #6c757d;
+  --accent: #4c6ef5;
+  --accent-dark: #3b5bdb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* ---------------- top bar ---------------- */
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+  padding: 0 20px;
+  background: #0f1222;
+  color: #fff;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #4c6ef5, #12b886);
+  font-size: 16px;
+}
+
+.top-options {
+  display: flex;
+  gap: 18px;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #cbd0dc;
+}
+
+.option input {
+  width: 72px;
+  padding: 6px 8px;
+  border: 1px solid #343a46;
+  border-radius: 6px;
+  background: #1b1f2e;
+  color: #fff;
+  font-size: 13px;
+}
+
+/* ---------------- layout ---------------- */
+.app-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.side-menu {
+  width: 220px;
+  flex-shrink: 0;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  padding: 12px 0;
+  overflow-y: auto;
+}
+
+.side-menu-title {
+  padding: 4px 16px 10px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+}
+
+.side-menu ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.side-menu li {
+  padding: 10px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  border-left: 3px solid transparent;
+  color: #343a40;
+}
+
+.side-menu li:hover {
+  background: #f1f3f5;
+}
+
+.side-menu li.active {
+  background: #eef1ff;
+  border-left-color: var(--accent);
+  color: var(--accent-dark);
+  font-weight: 600;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---------------- tabs ---------------- */
+.tab-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  padding: 8px 12px 0;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  background: #f8f9fa;
+  cursor: pointer;
+  font-size: 13px;
+  color: #495057;
+  max-width: 260px;
+}
+
+.tab.active {
+  background: #fff;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.tab-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.tab-dot.schema {
+  background: var(--accent);
+}
+
+.tab-dot.data {
+  background: #12b886;
+}
+
+.tab-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tab-close {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1;
+  padding: 2px;
+}
+
+.tab-close:hover {
+  color: #e03131;
+}
+
+/* ---------------- canvas ---------------- */
+.canvas-area {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  background: #fafbfc;
+}
+
+.canvas-host {
+  width: 100%;
+  height: 100%;
+}
+
+.empty-hint {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+
+.error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 8px 12px 0;
+  padding: 8px 12px;
+  background: #fff5f5;
+  border: 1px solid #ffc9c9;
+  color: #c92a2a;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+/* ---------------- buttons ---------------- */
+.btn {
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.btn:hover {
+  background: #f1f3f5;
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: var(--accent-dark);
+}
+
+.btn-icon {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 16px;
+  color: var(--muted);
+}
+
+.btn-icon:hover {
+  color: var(--text);
+}
+
+/* ---------------- modal ---------------- */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 18, 34, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal-panel {
+  width: min(640px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border-radius: 12px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.modal-body {
+  padding: 16px 20px;
+  overflow-y: auto;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+}
+
+.modal-hint {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.field-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.field-table th,
+.field-table td {
+  text-align: left;
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.field-table th {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--muted);
+}
+
+.field-table select,
+.field-table input {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  background: #fff;
+}
+
+.field-table input:disabled {
+  background: #f1f3f5;
+  color: var(--muted);
+}
+
+.muted {
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 0.9em;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  word-break: break-all;
+}
+
