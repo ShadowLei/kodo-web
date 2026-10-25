@@ -1,4 +1,4 @@
-import type { DataNodeDTO, NetworkDTO } from "@/api/contracts";
+import type { DataNodeDTO, NetworkDTO, QueryExpressionDTO } from "@/api/contracts";
 
 /** A node ready to be rendered on the canvas. */
 export interface GraphNode {
@@ -6,7 +6,7 @@ export interface GraphNode {
   label: string;
   sublabel?: string;
   ns: string;
-  kind: "schema" | "data";
+  kind: "schema" | "data" | "query";
   isRoot?: boolean;
   data?: Record<string, unknown>;
   dataNode?: DataNodeDTO;
@@ -20,6 +20,8 @@ export interface GraphEdge {
   from: string;
   to: string;
   label?: string;
+  /** When true, draw arrowheads on both ends (e.g. `==` links). */
+  bidirectional?: boolean;
 }
 
 export interface Graph {
@@ -54,7 +56,7 @@ export function buildSchemaGraph(network: NetworkDTO): Graph {
       kind: "schema",
       x: cx + Math.cos(angle) * radius,
       y: cy + Math.sin(angle) * radius,
-      radius: 48,
+      radius: 36,
     };
   });
 
@@ -63,6 +65,7 @@ export function buildSchemaGraph(network: NetworkDTO): Graph {
     from: ln.$from,
     to: ln.$to,
     label: `${ln.expression.$from ?? ""} ${ln.expression.$op ?? ""} ${ln.expression.$to ?? ""}`,
+    bidirectional: ln.expression.$op === "==",
   }));
 
   return { nodes, edges, width, height };
@@ -70,12 +73,17 @@ export function buildSchemaGraph(network: NetworkDTO): Graph {
 
 const idOf = (n: { $ns: string; $id?: string | number }) => `${n.$ns}.${n.$id}`;
 
-const LAYER_GAP_X = 230;
-const LAYER_GAP_Y = 96;
-const NODE_RADIUS = 40;
+const LAYER_GAP_X = 220;
+const LAYER_GAP_Y = 92;
+const NODE_RADIUS = 36;
+
+export interface QueryInfo {
+  ns: string;
+  expression: QueryExpressionDTO;
+}
 
 /** Build a data graph (DataNodes + parent/child edges) from a lookup result. */
-export function buildDataGraph(nodes: DataNodeDTO[]): Graph {
+export function buildDataGraph(nodes: DataNodeDTO[], query?: QueryInfo): Graph {
   const childrenOf = new Map<string, DataNodeDTO[]>();
   const roots: DataNodeDTO[] = [];
 
@@ -124,6 +132,9 @@ export function buildDataGraph(nodes: DataNodeDTO[]): Graph {
   const height = Math.max(620, maxSiblings * LAYER_GAP_Y + 120);
   const cy = height / 2;
 
+  // The query node occupies the leftmost layer; shift data layers to the right.
+  const layerOffset = query ? 1 : 0;
+
   const graphNodes: GraphNode[] = nodes.map((n) => {
     const id = idOf(n);
     const depth = depthOf.get(id) ?? 0;
@@ -138,7 +149,7 @@ export function buildDataGraph(nodes: DataNodeDTO[]): Graph {
       isRoot: !n.$from,
       data: n.data,
       dataNode: n,
-      x: 140 + depth * LAYER_GAP_X,
+      x: 140 + (depth + layerOffset) * LAYER_GAP_X,
       y: cy + (idx - (siblings.length - 1) / 2) * LAYER_GAP_Y,
       radius: NODE_RADIUS,
     };
@@ -155,6 +166,66 @@ export function buildDataGraph(nodes: DataNodeDTO[]): Graph {
     }
   });
 
-  const width = 140 + (maxDepth + 1) * LAYER_GAP_X + 120;
+  // Add the startup QueryNode (the query condition) + edges to its direct results.
+  if (query) {
+    const queryId = `query:${query.ns}`;
+    graphNodes.push({
+      id: queryId,
+      label: query.ns,
+      sublabel: formatExpression(query.expression),
+      ns: query.ns,
+      kind: "query",
+      x: 140,
+      y: cy,
+      radius: 36,
+    });
+    roots.forEach((r) => {
+      edges.push({
+        id: `${queryId}->${idOf(r)}`,
+        from: queryId,
+        to: idOf(r),
+      });
+    });
+  }
+
+  const width = 140 + (maxDepth + 1 + layerOffset) * LAYER_GAP_X + 120;
   return { nodes: graphNodes, edges, width, height };
+}
+
+/* ------------------------- expression formatting ------------------------- */
+
+function formatValue(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(formatValue).join(", ")}]`;
+  if (typeof v === "string") return `"${v}"`;
+  if (v === null || v === undefined) return String(v);
+  return String(v);
+}
+
+/** Render a QueryExpression into a compact human-readable string. */
+export function formatExpression(exp: QueryExpressionDTO): string {
+  const parts: string[] = [];
+
+  for (const key in exp) {
+    if (key === "$with" || key === "$where") continue;
+    const val = exp[key];
+    const isOpValue =
+      val !== null &&
+      typeof val === "object" &&
+      !Array.isArray(val) &&
+      "$op" in (val as object);
+    if (isOpValue) {
+      const op = (val as { $op: string }).$op;
+      const opVal = (val as { $val: unknown }).$val;
+      parts.push(`${key} ${op} ${formatValue(opVal)}`);
+    } else {
+      parts.push(`${key} == ${formatValue(val)}`);
+    }
+  }
+
+  if (exp.$where && exp.$where.length) {
+    exp.$where.forEach((w) => parts.push(`(${formatExpression(w)})`));
+  }
+
+  const withOp = exp.$with ?? "&&";
+  return parts.length ? parts.join(` ${withOp} `) : "(all)";
 }

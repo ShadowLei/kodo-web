@@ -1,10 +1,12 @@
-import { Kodo } from "@kodo-core/kodo";
-import { MemoryProvider } from "@kodo-core/providers/memoryProvider";
-import { NodeTranslator } from "@kodo-core/translators/nodeTranslator";
-import type { DataNode } from "@kodo-core/nodes/dataNode";
-import type { LinkNode } from "@kodo-core/nodes/linkNode";
-import type { QueryNode } from "@kodo-core/nodes/queryNode";
-import type { QueryExpression } from "@kodo-core/expressions/queryExpression";
+import {
+  Kodo,
+  MemoryProvider,
+  NodeTranslator,
+  type DataNode,
+  type LinkNode,
+  type QueryNode,
+  type QueryExpression,
+} from "kodo-core";
 
 import type { IKodoServer } from "./IKodoServer";
 import type {

@@ -18,8 +18,7 @@
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
-      "@kodo-core/*": ["../kodo-core/src/*"]
+      "@/*": ["./src/*"]
     }
   },
   "include": ["src", "env.d.ts"]

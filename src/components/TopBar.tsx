@@ -5,11 +5,11 @@ interface Props {
   onChange: (options: KodoOptionsDTO) => void;
 }
 
-/** Top bar with the kodo KodoOption inputs (tierLimit / limit). */
+/** Top bar with the kodo KodoOption inputs (tierLimit / limit / recursion). */
 export function TopBar({ options, onChange }: Props) {
   const setNum = (key: "tierLimit" | "limit", raw: string) => {
     const n = parseInt(raw, 10);
-    onChange({ ...options, [key]: Number.isNaN(n) ? 0 : n });
+    onChange({ ...options, [key]: Number.isNaN(n) ? 1 : n });
   };
 
   return (
@@ -24,10 +24,10 @@ export function TopBar({ options, onChange }: Props) {
           <span>tierLimit</span>
           <input
             type="number"
-            min={0}
+            min={1}
             value={options.tierLimit}
             onChange={(e) => setNum("tierLimit", e.target.value)}
-            title="Maximum number of relationship tiers to explore (0 = unlimited)"
+            title="Maximum number of relationship tiers to explore"
           />
         </label>
         <label className="option">
@@ -40,7 +40,16 @@ export function TopBar({ options, onChange }: Props) {
             title="Forced result limit per query"
           />
         </label>
+        <label className="option option-check">
+          <input
+            type="checkbox"
+            checked={!!options.recursion}
+            onChange={(e) => onChange({ ...options, recursion: e.target.checked })}
+          />
+          <span>recursion</span>
+        </label>
       </div>
     </header>
   );
 }
+

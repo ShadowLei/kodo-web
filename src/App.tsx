@@ -10,6 +10,7 @@ import type {
 } from "@/api/contracts";
 import { buildDataGraph, buildSchemaGraph } from "@/graph/model";
 import type { GraphNode } from "@/graph/model";
+import type { PositionMap } from "@/graph/forceLayout";
 import { NetworkCanvas } from "@/components/NetworkCanvas";
 import { TopBar } from "@/components/TopBar";
 import { SideMenu } from "@/components/SideMenu";
@@ -23,6 +24,15 @@ interface QueryModalState {
   dataModel: DataModelDTO;
 }
 
+interface DataTabResult {
+  nodes: DataNodeDTO[];
+  ns: string;
+  expression: QueryExpressionDTO;
+  options: KodoOptionsDTO;
+}
+
+const DEFAULT_OPTIONS: KodoOptionsDTO = { tierLimit: 10, limit: 10, recursion: false };
+
 export default function App() {
   const server = useMemo(() => createKodoServer(), []);
 
@@ -30,17 +40,24 @@ export default function App() {
   const [activeNetworkId, setActiveNetworkId] = useState<string | null>(null);
 
   const [networkCache, setNetworkCache] = useState<Map<string, NetworkDTO>>(new Map());
-  const [dataNodesByTab, setDataNodesByTab] = useState<Map<string, DataNodeDTO[]>>(new Map());
+  const [resultsByTab, setResultsByTab] = useState<Map<string, DataTabResult>>(new Map());
 
-  const [tabs, setTabs] = useState<Tab[]>([]);
-  const [activeTabId, setActiveTabId] = useState<string | null>(null);
+  // Node positions per tab, so re-layouts / drags survive tab switches.
+  const [positionsByTab, setPositionsByTab] = useState<Map<string, PositionMap>>(new Map());
 
-  const [options, setOptions] = useState<KodoOptionsDTO>({ tierLimit: 0, limit: 10 });
+  // Tabs & active tab are scoped per network (each menu item keeps its own set).
+  const [tabsByNetwork, setTabsByNetwork] = useState<Record<string, Tab[]>>({});
+  const [activeTabByNetwork, setActiveTabByNetwork] = useState<Record<string, string>>({});
+
+  const [options, setOptions] = useState<KodoOptionsDTO>(DEFAULT_OPTIONS);
   const [queryModal, setQueryModal] = useState<QueryModalState | null>(null);
   const [dataNodeModal, setDataNodeModal] = useState<DataNodeDTO | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const dataTabCounter = useRef(0);
+
+  const tabs = activeNetworkId ? (tabsByNetwork[activeNetworkId] ?? []) : [];
+  const activeTabId = activeNetworkId ? (activeTabByNetwork[activeNetworkId] ?? null) : null;
 
   const selectNetwork = useCallback(
     async (id: string) => {
@@ -48,13 +65,20 @@ export default function App() {
       try {
         const net = await server.getNetwork(id);
         setNetworkCache((prev) => new Map(prev).set(id, net));
-        const tabId = `schema:${id}`;
-        setTabs((prev) =>
-          prev.some((t) => t.id === tabId)
-            ? prev
-            : [...prev, { id: tabId, title: net.name, kind: "schema", closable: false }],
-        );
-        setActiveTabId(tabId);
+        const schemaTabId = `schema:${id}`;
+        setTabsByNetwork((prev) => {
+          const cur = prev[id] ?? [];
+          if (cur.some((t) => t.id === schemaTabId)) return prev;
+          return {
+            ...prev,
+            [id]: [...cur, { id: schemaTabId, title: net.name, kind: "schema", closable: false }],
+          };
+        });
+        // Remember the last active tab for this network (default to the schema tab).
+        setActiveTabByNetwork((prev) => ({
+          ...prev,
+          [id]: prev[id] ?? schemaTabId,
+        }));
         setError(null);
       } catch (e) {
         setError(String(e));
@@ -91,6 +115,13 @@ export default function App() {
         }
       } else if (node.kind === "data" && node.dataNode) {
         setDataNodeModal(node.dataNode);
+      } else if (node.kind === "query") {
+        // Clicking the QueryNode shows its query condition (like a DataNode).
+        setDataNodeModal({
+          $ns: node.ns,
+          $id: "query",
+          data: { condition: node.sublabel ?? "(all)" },
+        });
       }
     },
     [server, activeNetworkId],
@@ -107,12 +138,23 @@ export default function App() {
           options,
         });
         const tabId = `data:${dataTabCounter.current++}`;
-        setDataNodesByTab((prev) => new Map(prev).set(tabId, res.nodes));
-        setTabs((prev) => [
+        const networkId = queryModal.networkId;
+        setResultsByTab((prev) =>
+          new Map(prev).set(tabId, {
+            nodes: res.nodes,
+            ns: queryModal.ns,
+            expression,
+            options,
+          }),
+        );
+        setTabsByNetwork((prev) => ({
           ...prev,
-          { id: tabId, title: `${queryModal.ns} · ${res.nodes.length}`, kind: "data", closable: true },
-        ]);
-        setActiveTabId(tabId);
+          [networkId]: [
+            ...(prev[networkId] ?? []),
+            { id: tabId, title: `${queryModal.ns} · ${res.nodes.length}`, kind: "data", closable: true },
+          ],
+        }));
+        setActiveTabByNetwork((prev) => ({ ...prev, [networkId]: tabId }));
         setQueryModal(null);
         setError(null);
       } catch (e) {
@@ -122,23 +164,41 @@ export default function App() {
     [server, queryModal, options],
   );
 
+  const selectTab = useCallback(
+    (tabId: string) => {
+      if (!activeNetworkId) return;
+      setActiveTabByNetwork((prev) => ({ ...prev, [activeNetworkId]: tabId }));
+    },
+    [activeNetworkId],
+  );
+
   const closeTab = useCallback(
     (id: string) => {
-      setTabs((prev) => {
-        const idx = prev.findIndex((t) => t.id === id);
-        const next = prev.filter((t) => t.id !== id);
-        if (activeTabId === id) {
-          setActiveTabId(next[Math.max(0, idx - 1)]?.id ?? null);
+      if (!activeNetworkId) return;
+      setTabsByNetwork((prev) => {
+        const cur = prev[activeNetworkId] ?? [];
+        const idx = cur.findIndex((t) => t.id === id);
+        const next = cur.filter((t) => t.id !== id);
+        if ((activeTabByNetwork[activeNetworkId] ?? null) === id) {
+          setActiveTabByNetwork((p) => ({
+            ...p,
+            [activeNetworkId]: next[Math.max(0, idx - 1)]?.id ?? null,
+          }));
         }
-        return next;
+        return { ...prev, [activeNetworkId]: next };
       });
-      setDataNodesByTab((prev) => {
+      setResultsByTab((prev) => {
+        const m = new Map(prev);
+        m.delete(id);
+        return m;
+      });
+      setPositionsByTab((prev) => {
         const m = new Map(prev);
         m.delete(id);
         return m;
       });
     },
-    [activeTabId],
+    [activeNetworkId, activeTabByNetwork],
   );
 
   const activeGraph = useMemo(() => {
@@ -149,8 +209,13 @@ export default function App() {
       const net = networkCache.get(networkId);
       return net ? buildSchemaGraph(net) : null;
     }
-    return buildDataGraph(dataNodesByTab.get(tab.id) ?? []);
-  }, [tabs, activeTabId, networkCache, dataNodesByTab]);
+    const result = resultsByTab.get(tab.id);
+    if (!result) return null;
+    return buildDataGraph(result.nodes, { ns: result.ns, expression: result.expression });
+  }, [tabs, activeTabId, networkCache, resultsByTab]);
+
+  const activeTab = tabs.find((t) => t.id === activeTabId);
+  const activeResult = activeTabId ? resultsByTab.get(activeTabId) : undefined;
 
   return (
     <div className="app">
@@ -161,7 +226,7 @@ export default function App() {
           <TabBar
             tabs={tabs}
             activeId={activeTabId}
-            onSelect={setActiveTabId}
+            onSelect={selectTab}
             onClose={closeTab}
           />
           {error && (
@@ -172,7 +237,37 @@ export default function App() {
           )}
           <div className="canvas-area">
             {activeGraph ? (
-              <NetworkCanvas graph={activeGraph} onNodeClick={handleNodeClick} />
+              <>
+                <NetworkCanvas
+                  graph={activeGraph}
+                  savedPositions={activeTabId ? positionsByTab.get(activeTabId) : undefined}
+                  onPositionsCommit={(p) => {
+                    if (activeTabId) {
+                      setPositionsByTab((prev) => new Map(prev).set(activeTabId, p));
+                    }
+                  }}
+                  onNodeClick={handleNodeClick}
+                />
+                {activeTab?.kind === "data" && activeResult && (
+                  <div className="canvas-options">
+                    <div className="canvas-options-title">
+                      Query {activeResult.ns}
+                    </div>
+                    <div className="canvas-options-row">
+                      <span>tierLimit</span>
+                      <span className="mono">{activeResult.options.tierLimit}</span>
+                    </div>
+                    <div className="canvas-options-row">
+                      <span>limit</span>
+                      <span className="mono">{activeResult.options.limit}</span>
+                    </div>
+                    <div className="canvas-options-row">
+                      <span>recursion</span>
+                      <span className="mono">{String(activeResult.options.recursion)}</span>
+                    </div>
+                  </div>
+                )}
+              </>
             ) : (
               <div className="empty-hint">Select a network from the left menu.</div>
             )}
@@ -193,4 +288,3 @@ export default function App() {
     </div>
   );
 }
-
