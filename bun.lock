@@ -5,7 +5,7 @@
     "": {
       "name": "kodo-web",
       "dependencies": {
-        "kodo-core": "^0.1.7",
+        "kodo-core": "^0.1.8",
         "konva": "^9.3.16",
         "react": "^18.3.1",
         "react-dom": "^18.3.1",
@@ -301,7 +301,7 @@
 
     "json5": ["json5@2.2.3", "", { "bin": { "json5": "lib/cli.js" } }, "sha512-XmOWe7eyHYH14cLdVPoyg+GOH3rYX++KpzrylJwSW98t3Nk+U8XOl8FWKOgwtzdb8lXGf6zYwDUzeHMWfxasyg=="],
 
-    "kodo-core": ["kodo-core@0.1.7", "", { "dependencies": { "@aws-sdk/client-dynamodb": "^3.1156.0", "@aws-sdk/lib-dynamodb": "^3.1156.0", "@types/pg": "^8.23.1", "pg": "^8.23.0", "typeorm": "^1.1.1" }, "peerDependencies": { "typescript": "^6" } }, "sha512-hhMofl9SUuGTbQrT2FHlbkA6En1h/8ns7okpgSm4NIh7pwmD8bZtG9a1RFYXzBMZXuy89ncl9RMZLVuCvzU5pg=="],
+    "kodo-core": ["kodo-core@0.1.8", "", { "dependencies": { "@aws-sdk/client-dynamodb": "^3.1156.0", "@aws-sdk/lib-dynamodb": "^3.1156.0", "@types/pg": "^8.23.1", "pg": "^8.23.0", "typeorm": "^1.1.1" }, "peerDependencies": { "typescript": "^6" } }, "sha512-WKzWSdK6a+AOzVpL4Zsk/VUJNlkRjvt7N8DLNj7uuVSAf13pMYJIIYOalEwhsEy//wvzAr7DMFBpq3egFPHH4g=="],
 
     "konva": ["konva@9.3.22", "", {}, "sha512-yQI5d1bmELlD/fowuyfOp9ff+oamg26WOCkyqUyc+nczD/lhRa3EvD2MZOoc4c1293TAubW9n34fSQLgSeEgSw=="],
 

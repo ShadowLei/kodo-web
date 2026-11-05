@@ -73,6 +73,22 @@ export function buildSchemaGraph(network: NetworkDTO): Graph {
 
 const idOf = (n: { $ns: string; $id?: string | number }) => `${n.$ns}.${n.$id}`;
 
+/**
+ * Parent ids of a data node that actually exist in this result and are not
+ * repeated, so a node reached twice through the same parent gets one edge.
+ */
+function uniqueParentIds(n: DataNodeDTO, known: Set<string>): string[] {
+  const ids: string[] = [];
+  const seen = new Set<string>();
+  n.$from.forEach((parent) => {
+    const pid = idOf(parent);
+    if (!known.has(pid) || seen.has(pid)) return;
+    seen.add(pid);
+    ids.push(pid);
+  });
+  return ids;
+}
+
 const LAYER_GAP_X = 220;
 const LAYER_GAP_Y = 92;
 const NODE_RADIUS = 36;
@@ -84,21 +100,28 @@ export interface QueryInfo {
 
 /** Build a data graph (DataNodes + parent/child edges) from a lookup result. */
 export function buildDataGraph(nodes: DataNodeDTO[], query?: QueryInfo): Graph {
+  const nodeIds = new Set(nodes.map(idOf));
   const childrenOf = new Map<string, DataNodeDTO[]>();
   const roots: DataNodeDTO[] = [];
 
+  // A node may have several parents (kodo-core records every query path that
+  // reached it), so both the child index and the edges are built per parent.
   nodes.forEach((n) => {
-    if (n.$from) {
-      const pid = idOf(n.$from);
+    const parentIds = uniqueParentIds(n, nodeIds);
+    if (parentIds.length === 0) {
+      roots.push(n);
+      return;
+    }
+    parentIds.forEach((pid) => {
       const arr = childrenOf.get(pid) ?? [];
       arr.push(n);
       childrenOf.set(pid, arr);
-    } else {
-      roots.push(n);
-    }
+    });
   });
 
-  // BFS layering by depth.
+  // BFS layering by depth. The `visited` set also protects against a cycle in
+  // the parent graph (e.g. mutually recursive links), which would otherwise
+  // enqueue nodes forever.
   const depthOf = new Map<string, number>();
   const queue: { node: DataNodeDTO; depth: number }[] = roots.map((r) => ({ node: r, depth: 0 }));
   const visited = new Set<string>();
@@ -109,9 +132,13 @@ export function buildDataGraph(nodes: DataNodeDTO[], query?: QueryInfo): Graph {
     if (visited.has(id)) continue;
     visited.add(id);
     depthOf.set(id, depth);
-    (childrenOf.get(id) ?? []).forEach((k) => queue.push({ node: k, depth: depth + 1 }));
+    (childrenOf.get(id) ?? []).forEach((k) => {
+      if (!visited.has(idOf(k))) queue.push({ node: k, depth: depth + 1 });
+    });
   }
 
+  // Nodes only reachable through a cycle have no root; give them a layer too
+  // rather than dropping them from the layout.
   nodes.forEach((n) => {
     const id = idOf(n);
     if (!depthOf.has(id)) depthOf.set(id, 0);
@@ -146,7 +173,7 @@ export function buildDataGraph(nodes: DataNodeDTO[], query?: QueryInfo): Graph {
       sublabel: String(n.$id),
       ns: n.$ns,
       kind: "data",
-      isRoot: !n.$from,
+      isRoot: n.$from.length === 0,
       data: n.data,
       dataNode: n,
       x: 140 + (depth + layerOffset) * LAYER_GAP_X,
@@ -157,13 +184,13 @@ export function buildDataGraph(nodes: DataNodeDTO[], query?: QueryInfo): Graph {
 
   const edges: GraphEdge[] = [];
   nodes.forEach((n) => {
-    if (n.$from) {
+    uniqueParentIds(n, nodeIds).forEach((pid) => {
       edges.push({
-        id: `${idOf(n.$from)}->${idOf(n)}`,
-        from: idOf(n.$from),
+        id: `${pid}->${idOf(n)}`,
+        from: pid,
         to: idOf(n),
       });
-    }
+    });
   });
 
   // Add the startup QueryNode (the query condition) + edges to its direct results.

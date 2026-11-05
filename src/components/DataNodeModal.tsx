@@ -22,9 +22,12 @@ export function DataNodeModal({ node, onClose }: Props) {
         </div>
 
         <div className="modal-body">
-          {node.$from && (
+          {node.$from.length > 0 && (
             <p className="modal-hint">
-              from {node.$from.$ns} #{String(node.$from.$id)}
+              from{" "}
+              {node.$from
+                .map((parent) => `${parent.$ns} #${String(parent.$id)}`)
+                .join(" · ")}
             </p>
           )}
           {entries.length === 0 ? (
