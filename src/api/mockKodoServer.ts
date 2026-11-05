@@ -52,6 +52,23 @@ interface NetworkDef {
   links: LinkDef[];
 }
 
+/**
+ * Normalize `DataNode.$fromQN` across kodo-core versions.
+ *
+ * 0.1.7 stored a single `QueryNode`; 0.1.8 changed it to `QueryNode[]`.
+ * Accepting both keeps a stale install (new code, old dependency) from
+ * throwing `TypeError: object is not iterable` at runtime.
+ */
+function recordedQueryNodes(dn: DataNode<unknown>): QueryNode<unknown>[] {
+  const qn = dn.$fromQN as unknown as
+    | QueryNode<unknown>
+    | QueryNode<unknown>[]
+    | null
+    | undefined;
+  if (!qn) return [];
+  return Array.isArray(qn) ? qn : [qn];
+}
+
 export class MockKodoServer implements IKodoServer {
   private readonly networkDefs = new Map<string, NetworkDef>();
   private readonly kodos = new Map<string, Kodo>();
@@ -146,7 +163,7 @@ export class MockKodoServer implements IKodoServer {
     // and therefore contributes no parent (which makes the node a root).
     const seen = new Set<string>();
     const from: DataNodeRefDTO[] = [];
-    for (const qn of dn.$fromQN ?? []) {
+    for (const qn of recordedQueryNodes(dn)) {
       const parent = qn?.$fromDN;
       if (!parent) continue;
       const key = `${parent.$ns}.${String(parent.$id)}`;
