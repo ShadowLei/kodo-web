@@ -81,14 +81,17 @@ export interface DataNodeRefDTO {
 }
 
 /**
- * A query result node. `$from` points at the node that produced it
- * (its `$fromQN.$fromDN`), so the result network edges can be rebuilt.
+ * A query result node. `$from` lists every node that produced it (its
+ * `$fromQN[i].$fromDN`), so the result network edges can be rebuilt.
+ *
+ * kodo-core >= 0.1.8 keeps all query paths that reach a node, so a node may
+ * have several parents (e.g. the same row reached through two links).
  */
 export interface DataNodeDTO {
   $ns: string;
   $id?: string | number;
   data: Record<string, unknown>;
-  $from?: DataNodeRefDTO | null;
+  $from: DataNodeRefDTO[];
 }
 
 export interface LookupResponseDTO {
