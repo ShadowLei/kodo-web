@@ -159,13 +159,18 @@ export class MockKodoServer implements IKodoServer {
 
   private toDataNodeDTO(dn: DataNode<unknown>): DataNodeDTO {
     // kodo-core >= 0.1.8 keeps every query path that reached this node, so a
-    // node can have several parents. The startup query node has no `$fromDN`
-    // and therefore contributes no parent (which makes the node a root).
+    // node can have several parents. A query node without `$fromDN` is the
+    // startup query: it contributes no data-node parent, but marks the node
+    // as a direct query result.
     const seen = new Set<string>();
     const from: DataNodeRefDTO[] = [];
+    let fromQuery = false;
     for (const qn of recordedQueryNodes(dn)) {
       const parent = qn?.$fromDN;
-      if (!parent) continue;
+      if (!parent) {
+        fromQuery = true;
+        continue;
+      }
       const key = `${parent.$ns}.${String(parent.$id)}`;
       if (seen.has(key)) continue;
       seen.add(key);
@@ -176,6 +181,7 @@ export class MockKodoServer implements IKodoServer {
       $id: dn.$id,
       data: (dn.data ?? {}) as Record<string, unknown>,
       $from: from,
+      $fromQuery: fromQuery,
     };
   }
 
@@ -276,10 +282,6 @@ function orderNetwork(): NetworkDef {
     links: [
       { $from: "Order", $to: "Payment", $fromField: "id", $op: "==", $toField: "orderid" },
       { $from: "Order", $to: "OrderOwner", $fromField: "id", $op: "==", $toField: "orderid" },
-      // Reaches the same Payment rows through their owner as through their
-      // order, so those rows have more than one parent DataNode. `===` keeps
-      // the relation one-way (no reverse Payment -> OrderOwner link).
-      { $from: "OrderOwner", $to: "Payment", $fromField: "orderid", $op: "===", $toField: "orderid" },
       { $from: "Payment", $to: "PaymentDetail", $fromField: "id", $op: "==", $toField: "paymentid" },
     ],
   };

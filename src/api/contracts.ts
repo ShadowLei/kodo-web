@@ -92,6 +92,13 @@ export interface DataNodeDTO {
   $id?: string | number;
   data: Record<string, unknown>;
   $from: DataNodeRefDTO[];
+  /**
+   * True when the startup QueryNode returned this node directly (one of its
+   * `$fromQN` entries has no `$fromDN`). Kept separately from `$from` so the
+   * query node keeps its outgoing edges even when a recursive lookup also
+   * gives the node data-node parents.
+   */
+  $fromQuery: boolean;
 }
 
 export interface LookupResponseDTO {

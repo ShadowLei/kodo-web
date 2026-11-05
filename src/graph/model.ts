@@ -102,16 +102,16 @@ export interface QueryInfo {
 export function buildDataGraph(nodes: DataNodeDTO[], query?: QueryInfo): Graph {
   const nodeIds = new Set(nodes.map(idOf));
   const childrenOf = new Map<string, DataNodeDTO[]>();
-  const roots: DataNodeDTO[] = [];
+  const parentIdsOf = new Map<string, string[]>();
+  const nodesWithoutParent: DataNodeDTO[] = [];
 
   // A node may have several parents (kodo-core records every query path that
   // reached it), so both the child index and the edges are built per parent.
   nodes.forEach((n) => {
+    const id = idOf(n);
     const parentIds = uniqueParentIds(n, nodeIds);
-    if (parentIds.length === 0) {
-      roots.push(n);
-      return;
-    }
+    parentIdsOf.set(id, parentIds);
+    if (parentIds.length === 0) nodesWithoutParent.push(n);
     parentIds.forEach((pid) => {
       const arr = childrenOf.get(pid) ?? [];
       arr.push(n);
@@ -119,11 +119,18 @@ export function buildDataGraph(nodes: DataNodeDTO[], query?: QueryInfo): Graph {
     });
   });
 
+  // Direct results of the startup query anchor the layout, even when a
+  // recursive lookup also gave them data-node parents (a cycle). Without this
+  // anchor every node would look like a root and collapse into one column, and
+  // the query -> result edges would be lost.
+  const querySeeds = nodes.filter((n) => n.$fromQuery);
+  const seeds = querySeeds.length ? querySeeds : nodesWithoutParent;
+
   // BFS layering by depth. The `visited` set also protects against a cycle in
   // the parent graph (e.g. mutually recursive links), which would otherwise
   // enqueue nodes forever.
   const depthOf = new Map<string, number>();
-  const queue: { node: DataNodeDTO; depth: number }[] = roots.map((r) => ({ node: r, depth: 0 }));
+  const queue: { node: DataNodeDTO; depth: number }[] = seeds.map((r) => ({ node: r, depth: 0 }));
   const visited = new Set<string>();
 
   while (queue.length) {
@@ -137,49 +144,48 @@ export function buildDataGraph(nodes: DataNodeDTO[], query?: QueryInfo): Graph {
     });
   }
 
-  // Nodes only reachable through a cycle have no root; give them a layer too
-  // rather than dropping them from the layout.
+  // Anything the anchor walk missed (disconnected or only reached backwards)
+  // still gets a layer rather than being dropped from the layout.
   nodes.forEach((n) => {
     const id = idOf(n);
     if (!depthOf.has(id)) depthOf.set(id, 0);
   });
 
   const maxDepth = Math.max(0, ...Array.from(depthOf.values()));
-
-  // Group nodes per depth to compute vertical centering.
-  const byDepth = new Map<number, DataNodeDTO[]>();
-  depthOf.forEach((d, id) => {
-    const n = nodes.find((x) => idOf(x) === id)!;
-    const arr = byDepth.get(d) ?? [];
-    arr.push(n);
-    byDepth.set(d, arr);
+  const layers: DataNodeDTO[][] = Array.from({ length: maxDepth + 1 }, () => []);
+  nodes.forEach((n) => {
+    layers[depthOf.get(idOf(n)) ?? 0].push(n);
   });
 
-  const maxSiblings = Math.max(1, ...Array.from(byDepth.values()).map((a) => a.length));
+  // Reorder each layer by the average position of its neighbours in the
+  // adjacent layer (a few barycenter sweeps). This keeps related nodes close
+  // and removes most edge crossings without moving nodes out of their layer.
+  orderLayers(layers, depthOf, parentIdsOf);
+
+  const maxSiblings = Math.max(1, ...layers.map((layer) => layer.length));
   const height = Math.max(620, maxSiblings * LAYER_GAP_Y + 120);
   const cy = height / 2;
 
   // The query node occupies the leftmost layer; shift data layers to the right.
   const layerOffset = query ? 1 : 0;
 
-  const graphNodes: GraphNode[] = nodes.map((n) => {
-    const id = idOf(n);
-    const depth = depthOf.get(id) ?? 0;
-    const siblings = byDepth.get(depth) ?? [];
-    const idx = siblings.findIndex((s) => idOf(s) === id);
-    return {
-      id,
-      label: n.$ns,
-      sublabel: String(n.$id),
-      ns: n.$ns,
-      kind: "data",
-      isRoot: n.$from.length === 0,
-      data: n.data,
-      dataNode: n,
-      x: 140 + (depth + layerOffset) * LAYER_GAP_X,
-      y: cy + (idx - (siblings.length - 1) / 2) * LAYER_GAP_Y,
-      radius: NODE_RADIUS,
-    };
+  const graphNodes: GraphNode[] = [];
+  layers.forEach((layer, depth) => {
+    layer.forEach((n, idx) => {
+      graphNodes.push({
+        id: idOf(n),
+        label: n.$ns,
+        sublabel: String(n.$id),
+        ns: n.$ns,
+        kind: "data",
+        isRoot: n.$fromQuery,
+        data: n.data,
+        dataNode: n,
+        x: 140 + (depth + layerOffset) * LAYER_GAP_X,
+        y: cy + (idx - (layer.length - 1) / 2) * LAYER_GAP_Y,
+        radius: NODE_RADIUS,
+      });
+    });
   });
 
   const edges: GraphEdge[] = [];
@@ -193,9 +199,10 @@ export function buildDataGraph(nodes: DataNodeDTO[], query?: QueryInfo): Graph {
     });
   });
 
-  // Add the startup QueryNode (the query condition) + edges to its direct results.
+  // Connect the startup QueryNode to the nodes it returned directly.
   if (query) {
     const queryId = `query:${query.ns}`;
+    const queryTargets = querySeeds.length ? querySeeds : nodesWithoutParent;
     graphNodes.push({
       id: queryId,
       label: query.ns,
@@ -206,7 +213,7 @@ export function buildDataGraph(nodes: DataNodeDTO[], query?: QueryInfo): Graph {
       y: cy,
       radius: 36,
     });
-    roots.forEach((r) => {
+    queryTargets.forEach((r) => {
       edges.push({
         id: `${queryId}->${idOf(r)}`,
         from: queryId,
@@ -217,6 +224,62 @@ export function buildDataGraph(nodes: DataNodeDTO[], query?: QueryInfo): Graph {
 
   const width = 140 + (maxDepth + 1 + layerOffset) * LAYER_GAP_X + 120;
   return { nodes: graphNodes, edges, width, height };
+}
+
+/** Stable barycenter ordering of each layer (a few sweeps, both directions). */
+function orderLayers(
+  layers: DataNodeDTO[][],
+  depthOf: Map<string, number>,
+  parentIdsOf: Map<string, string[]>,
+): void {
+  const indexInLayer = new Map<string, number>();
+  const reindex = () => {
+    layers.forEach((layer) => layer.forEach((n, i) => indexInLayer.set(idOf(n), i)));
+  };
+  reindex();
+
+  const childIdsOf = new Map<string, string[]>();
+  parentIdsOf.forEach((parentIds, id) => {
+    parentIds.forEach((pid) => {
+      const arr = childIdsOf.get(pid) ?? [];
+      arr.push(id);
+      childIdsOf.set(pid, arr);
+    });
+  });
+
+  const averageIndex = (ids: string[], targetDepth: number): number | null => {
+    let sum = 0;
+    let count = 0;
+    ids.forEach((id) => {
+      if (depthOf.get(id) !== targetDepth) return;
+      const idx = indexInLayer.get(id);
+      if (idx === undefined) return;
+      sum += idx;
+      count++;
+    });
+    return count ? sum / count : null;
+  };
+
+  const sortLayer = (layer: DataNodeDTO[], score: (n: DataNodeDTO) => number | null) =>
+    layer
+      .map((node, index) => ({ node, index, score: score(node) }))
+      .sort((a, b) => {
+        const av = a.score ?? a.index;
+        const bv = b.score ?? b.index;
+        return av === bv ? a.index - b.index : av - bv;
+      })
+      .map((entry) => entry.node);
+
+  for (let pass = 0; pass < 4; pass++) {
+    for (let d = 1; d < layers.length; d++) {
+      layers[d] = sortLayer(layers[d], (n) => averageIndex(parentIdsOf.get(idOf(n)) ?? [], d - 1));
+      reindex();
+    }
+    for (let d = layers.length - 2; d >= 0; d--) {
+      layers[d] = sortLayer(layers[d], (n) => averageIndex(childIdsOf.get(idOf(n)) ?? [], d + 1));
+      reindex();
+    }
+  }
 }
 
 /* ------------------------- expression formatting ------------------------- */

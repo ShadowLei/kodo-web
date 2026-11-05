@@ -240,7 +240,15 @@ export function NetworkCanvas({ graph, savedPositions, onPositionsCommit, onNode
 
   // Compute edge endpoints, shortened to the node boundary.
   const edgeSegments = useMemo(() => {
-    return graph.edges.map((edge) => {
+    const edgeKeys = new Set(graph.edges.map((e) => `${e.from}->${e.to}`));
+    // A recursive lookup can record both A->B and B->A. Draw that pair once,
+    // with arrowheads on both ends, instead of two lines on top of each other.
+    const visible = graph.edges.filter((edge) => {
+      if (edge.bidirectional) return true;
+      const hasReverse = edge.from !== edge.to && edgeKeys.has(`${edge.to}->${edge.from}`);
+      return !hasReverse || edge.from < edge.to;
+    });
+    return visible.map((edge) => {
       const from = positions[edge.from];
       const to = positions[edge.to];
       if (!from || !to) return null;
@@ -253,12 +261,14 @@ export function NetworkCanvas({ graph, savedPositions, onPositionsCommit, onNode
       const toNode = graph.nodes.find((n) => n.id === edge.to);
       const r1 = (fromNode?.radius ?? 34) * nodeScale;
       const r2 = (toNode?.radius ?? 34) * nodeScale;
-      const pad1 = edge.bidirectional ? 10 : 0;
+      const bidirectional =
+        !!edge.bidirectional || (edge.from !== edge.to && edgeKeys.has(`${edge.to}->${edge.from}`));
+      const pad1 = bidirectional ? 10 : 0;
       const pad2 = 10;
       const start = { x: from.x + ux * (r1 + pad1), y: from.y + uy * (r1 + pad1) };
       const end = { x: to.x - ux * (r2 + pad2), y: to.y - uy * (r2 + pad2) };
       const mid = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
-      return { edge, start, end, mid };
+      return { edge, start, end, mid, bidirectional };
     });
   }, [graph, positions, nodeScale]);
 
@@ -313,7 +323,7 @@ export function NetworkCanvas({ graph, savedPositions, onPositionsCommit, onNode
                   fill={edgeColor}
                   pointerLength={9}
                   pointerWidth={9}
-                  pointerAtBeginning={!!seg.edge.bidirectional}
+                  pointerAtBeginning={!!seg.bidirectional}
                   pointerAtEnding
                 />
                 {seg.edge.label && (
