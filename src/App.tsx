@@ -7,6 +7,8 @@ import type {
   NetworkDTO,
   NetworkSummaryDTO,
   QueryExpressionDTO,
+  WebConsoleBatchDTO,
+  WebConsoleMessageDTO,
 } from "@/api/contracts";
 import { buildDataGraph, buildSchemaGraph } from "@/graph/model";
 import type { GraphNode } from "@/graph/model";
@@ -17,6 +19,13 @@ import { SideMenu } from "@/components/SideMenu";
 import { TabBar, type Tab } from "@/components/TabBar";
 import { DataModelModal } from "@/components/DataModelModal";
 import { DataNodeModal } from "@/components/DataNodeModal";
+import { RulesPanel } from "@/components/RulesPanel";
+import { WebConsolePanel } from "@/components/WebConsolePanel";
+import {
+  newRuleKey,
+  splitRulesForCheck,
+  type StoredRule,
+} from "@/rules/ruleUtils";
 
 interface QueryModalState {
   networkId: string;
@@ -54,7 +63,35 @@ export default function App() {
   const [dataNodeModal, setDataNodeModal] = useState<DataNodeDTO | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Rules live per network, so they keep applying to every query of that
+  // network and are visible on all of its result tabs.
+  const [rulesByNetwork, setRulesByNetwork] = useState<Record<string, StoredRule[]>>({});
+  const [consoleBatches, setConsoleBatches] = useState<WebConsoleBatchDTO[]>([]);
+
   const dataTabCounter = useRef(0);
+  const localConsoleSeq = useRef(0);
+
+  const appendConsoleBatch = useCallback((batch: WebConsoleBatchDTO) => {
+    setConsoleBatches((prev) => [...prev, batch].slice(-50));
+  }, []);
+
+  /** Merge server-side WebConsole output with warnings generated in the UI. */
+  const pushConsoleResult = useCallback(
+    (
+      batch: WebConsoleBatchDTO | undefined,
+      warnings: WebConsoleMessageDTO[],
+      fallbackTitle: string,
+    ) => {
+      if (!batch && warnings.length === 0) return;
+      appendConsoleBatch({
+        id: batch?.id ?? `local-console-${localConsoleSeq.current++}`,
+        at: batch?.at ?? new Date().toISOString(),
+        title: batch?.title ?? fallbackTitle,
+        messages: [...warnings, ...(batch?.messages ?? [])],
+      });
+    },
+    [appendConsoleBatch],
+  );
 
   const tabs = activeNetworkId ? (tabsByNetwork[activeNetworkId] ?? []) : [];
   const activeTabId = activeNetworkId ? (activeTabByNetwork[activeNetworkId] ?? null) : null;
@@ -132,15 +169,17 @@ export default function App() {
   const handleQuery = useCallback(
     async (expression: QueryExpressionDTO) => {
       if (!queryModal) return;
+      const networkId = queryModal.networkId;
+      const { rules, warnings } = splitRulesForCheck(rulesByNetwork[networkId] ?? []);
       try {
         const res = await server.lookup({
-          networkId: queryModal.networkId,
+          networkId,
           ns: queryModal.ns,
           expression,
           options,
+          rules,
         });
         const tabId = `data:${dataTabCounter.current++}`;
-        const networkId = queryModal.networkId;
         setResultsByTab((prev) =>
           new Map(prev).set(tabId, {
             nodes: res.nodes,
@@ -157,13 +196,18 @@ export default function App() {
           ],
         }));
         setActiveTabByNetwork((prev) => ({ ...prev, [networkId]: tabId }));
+        pushConsoleResult(
+          res.console,
+          warnings,
+          `Query ${queryModal.ns} · ${res.nodes.length} node(s)`,
+        );
         setQueryModal(null);
         setError(null);
       } catch (e) {
         setError(String(e));
       }
     },
-    [server, queryModal, options],
+    [server, queryModal, options, rulesByNetwork, pushConsoleResult],
   );
 
   const selectTab = useCallback(
@@ -218,6 +262,70 @@ export default function App() {
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
   const activeResult = activeTabId ? resultsByTab.get(activeTabId) : undefined;
+  const activeRules = activeNetworkId
+    ? rulesByNetwork[activeNetworkId] ?? []
+    : [];
+
+  const recheckRules = useCallback(
+    async (storedRules: StoredRule[]) => {
+      if (!activeNetworkId || !activeResult) return;
+      const { rules, warnings } = splitRulesForCheck(storedRules);
+      try {
+        const res = await server.checkRules({
+          networkId: activeNetworkId,
+          ns: activeResult.ns,
+          rules,
+          nodes: activeResult.nodes,
+        });
+        pushConsoleResult(
+          res.console,
+          warnings,
+          `Rules check · ${activeResult.ns} · ${activeResult.nodes.length} node(s)`,
+        );
+      } catch (e) {
+        setError(String(e));
+      }
+    },
+    [activeNetworkId, activeResult, server, pushConsoleResult],
+  );
+
+  const addRule = useCallback(
+    (raw: string) => {
+      if (!activeNetworkId) return;
+      const next = [
+        ...(rulesByNetwork[activeNetworkId] ?? []),
+        { key: newRuleKey(), raw },
+      ];
+      setRulesByNetwork((prev) => ({ ...prev, [activeNetworkId]: next }));
+      void recheckRules(next);
+    },
+    [activeNetworkId, rulesByNetwork, recheckRules],
+  );
+
+  const updateRule = useCallback(
+    (key: string, raw: string) => {
+      if (!activeNetworkId) return;
+      const next = (rulesByNetwork[activeNetworkId] ?? []).map((rule) =>
+        rule.key === key ? { ...rule, raw } : rule,
+      );
+      setRulesByNetwork((prev) => ({ ...prev, [activeNetworkId]: next }));
+      void recheckRules(next);
+    },
+    [activeNetworkId, rulesByNetwork, recheckRules],
+  );
+
+  const removeRule = useCallback(
+    (key: string) => {
+      if (!activeNetworkId) return;
+      setRulesByNetwork((prev) => ({
+        ...prev,
+        [activeNetworkId]: (prev[activeNetworkId] ?? []).filter(
+          (rule) => rule.key !== key,
+        ),
+      }));
+    },
+    [activeNetworkId],
+  );
 
   return (
     <div className="app">
@@ -240,35 +348,51 @@ export default function App() {
           <div className="canvas-area">
             {activeGraph ? (
               <>
-                <NetworkCanvas
-                  graph={activeGraph}
-                  savedPositions={activeTabId ? positionsByTab.get(activeTabId) : undefined}
-                  onPositionsCommit={(p) => {
-                    if (activeTabId) {
-                      setPositionsByTab((prev) => new Map(prev).set(activeTabId, p));
-                    }
-                  }}
-                  onNodeClick={handleNodeClick}
-                />
-                {activeTab?.kind === "data" && activeResult && (
-                  <div className="canvas-options">
-                    <div className="canvas-options-title">
-                      Query {activeResult.ns}
-                    </div>
-                    <div className="canvas-options-row">
-                      <span>tierLimit</span>
-                      <span className="mono">{activeResult.options.tierLimit}</span>
-                    </div>
-                    <div className="canvas-options-row">
-                      <span>limit</span>
-                      <span className="mono">{activeResult.options.limit}</span>
-                    </div>
-                    <div className="canvas-options-row">
-                      <span>recursion</span>
-                      <span className="mono">{String(activeResult.options.recursion)}</span>
-                    </div>
+                <div className="canvas-main">
+                  <NetworkCanvas
+                    graph={activeGraph}
+                    savedPositions={activeTabId ? positionsByTab.get(activeTabId) : undefined}
+                    onPositionsCommit={(p) => {
+                      if (activeTabId) {
+                        setPositionsByTab((prev) => new Map(prev).set(activeTabId, p));
+                      }
+                    }}
+                    onNodeClick={handleNodeClick}
+                  />
+                  <div className="canvas-left-stack">
+                    {activeTab?.kind === "data" && activeResult && (
+                      <div className="canvas-options">
+                        <div className="canvas-options-title">
+                          Query {activeResult.ns}
+                        </div>
+                        <div className="canvas-options-row">
+                          <span>tierLimit</span>
+                          <span className="mono">{activeResult.options.tierLimit}</span>
+                        </div>
+                        <div className="canvas-options-row">
+                          <span>limit</span>
+                          <span className="mono">{activeResult.options.limit}</span>
+                        </div>
+                        <div className="canvas-options-row">
+                          <span>recursion</span>
+                          <span className="mono">{String(activeResult.options.recursion)}</span>
+                        </div>
+                      </div>
+                    )}
+                    {activeTab?.kind === "data" && activeResult && (
+                      <RulesPanel
+                        rules={activeRules}
+                        onAdd={addRule}
+                        onUpdate={updateRule}
+                        onRemove={removeRule}
+                      />
+                    )}
                   </div>
-                )}
+                </div>
+                <WebConsolePanel
+                  batches={consoleBatches}
+                  onClear={() => setConsoleBatches([])}
+                />
               </>
             ) : (
               <div className="empty-hint">Select a network from the left menu.</div>

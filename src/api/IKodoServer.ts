@@ -1,4 +1,6 @@
 import type {
+  CheckRulesRequestDTO,
+  CheckRulesResponseDTO,
   DataModelDTO,
   LookupRequestDTO,
   LookupResponseDTO,
@@ -24,6 +26,16 @@ export interface IKodoServer {
   /** Fetch the dynamic data model for a namespace within a network. */
   getDataModel(networkId: string, ns: string): Promise<DataModelDTO>;
 
-  /** Run a kodo lookup (explore) and return the resulting data-node network. */
+  /**
+   * Run a kodo lookup (explore) and return the resulting data-node network.
+   * Any `rules` in the request are checked against the result through
+   * `kodo.checkRules()`, and the WebConsole output rides along in `console`.
+   */
   lookup(req: LookupRequestDTO): Promise<LookupResponseDTO>;
+
+  /**
+   * Re-check rules against a result the UI already holds (for example right
+   * after a rule is added or edited), without running the lookup again.
+   */
+  checkRules(req: CheckRulesRequestDTO): Promise<CheckRulesResponseDTO>;
 }

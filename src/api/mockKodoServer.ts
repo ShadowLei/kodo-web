@@ -1,15 +1,19 @@
 import {
+  DataNode as KodoDataNode,
   Kodo,
   MemoryProvider,
   NodeTranslator,
   type DataNode,
   type LinkNode,
+  type NotificationRule,
   type QueryNode,
   type QueryExpression,
 } from "kodo-core";
 
 import type { IKodoServer } from "./IKodoServer";
 import type {
+  CheckRulesRequestDTO,
+  CheckRulesResponseDTO,
   DataModelDTO,
   DataNodeDTO,
   DataNodeRefDTO,
@@ -18,7 +22,10 @@ import type {
   LookupResponseDTO,
   NetworkDTO,
   NetworkSummaryDTO,
+  NotificationRuleDTO,
+  WebConsoleBatchDTO,
 } from "./contracts";
+import { WebConsoleNotifier } from "./WebConsoleNotifier";
 
 /* ------------------------------------------------------------------ *
  * Simulated web tier.
@@ -72,6 +79,9 @@ function recordedQueryNodes(dn: DataNode<unknown>): QueryNode<unknown>[] {
 export class MockKodoServer implements IKodoServer {
   private readonly networkDefs = new Map<string, NetworkDef>();
   private readonly kodos = new Map<string, Kodo>();
+  /** One WebConsole sink per Kodo instance, registered by default. */
+  private readonly webConsoles = new Map<string, WebConsoleNotifier>();
+  private consoleSeq = 0;
 
   constructor() {
     this.registerNetworks();
@@ -127,13 +137,95 @@ export class MockKodoServer implements IKodoServer {
     };
 
     const dataNodes = await kodo.explore(queryNode);
+    const consoleBatch = await this.runRuleChecks(
+      req.networkId,
+      req.ns,
+      req.rules ?? [],
+      dataNodes,
+      "query",
+    );
 
     return {
       nodes: dataNodes.map((dn) => this.toDataNodeDTO(dn)),
+      console: consoleBatch,
     };
   }
 
+  /** Re-check rules against result nodes the UI already holds. */
+  async checkRules(req: CheckRulesRequestDTO): Promise<CheckRulesResponseDTO> {
+    const kodo = this.kodos.get(req.networkId);
+    if (!kodo) {
+      throw new Error(`Network not found: ${req.networkId}`);
+    }
+
+    const nodes = req.nodes.map((node) => this.toKodoDataNode(node));
+    const consoleBatch = await this.runRuleChecks(
+      req.networkId,
+      req.ns,
+      req.rules,
+      nodes,
+      "check",
+    );
+    return { console: consoleBatch };
+  }
+
   /* ------------------------------ helpers ------------------------------ */
+
+  /**
+   * Run kodo-core's notification engine and collect the `web-console`
+   * channel's output into one batch.
+   *
+   * kodo-core only invokes notifiers for violations, so a rule that passed is
+   * reported to the notifier explicitly here. That keeps the success line
+   * (`"<id> Exec Succeed"`) in the same batch as the failures.
+   */
+  private async runRuleChecks(
+    networkId: string,
+    ns: string,
+    rules: NotificationRuleDTO[],
+    nodes: KodoDataNode<any>[],
+    kind: "query" | "check",
+  ): Promise<WebConsoleBatchDTO | undefined> {
+    const kodo = this.kodos.get(networkId);
+    const webConsole = this.webConsoles.get(networkId);
+    if (!kodo || !webConsole) {
+      throw new Error(`Notifiers are not registered for network: ${networkId}`);
+    }
+
+    webConsole.reset();
+    if (rules.length === 0) return undefined;
+
+    const activeRules = rules.filter((rule) => rule.active !== false);
+    const violations = await kodo.checkRules(activeRules as NotificationRule[], nodes);
+    const violatedRules = new Set(violations.map((violation) => violation.rule));
+
+    for (const rule of activeRules) {
+      if (violatedRules.has(rule)) continue;
+      if (!rule.notify?.channels?.includes(webConsole.name)) continue;
+      await webConsole.notify(rule as NotificationRule, []);
+    }
+
+    const messages = webConsole.drain();
+    if (messages.length === 0) return undefined;
+
+    return {
+      id: `console-${++this.consoleSeq}`,
+      at: new Date().toISOString(),
+      title:
+        kind === "query"
+          ? `Query ${ns} · ${nodes.length} node(s)`
+          : `Rules check · ${ns} · ${nodes.length} node(s)`,
+      messages,
+    };
+  }
+
+  private toKodoDataNode(node: DataNodeDTO): KodoDataNode<any> {
+    const kodoNode = new KodoDataNode<any>();
+    kodoNode.$ns = node.$ns;
+    kodoNode.$id = node.$id;
+    kodoNode.data = node.data;
+    return kodoNode;
+  }
 
   private requireNetwork(id: string): NetworkDef {
     const def = this.networkDefs.get(id);
@@ -209,6 +301,10 @@ export class MockKodoServer implements IKodoServer {
 
     kodo.registerTranslator(translator);
     kodo.registerProvider("*", provider);
+
+    const webConsole = new WebConsoleNotifier();
+    kodo.registerNotifier(webConsole);
+    this.webConsoles.set(def.id, webConsole);
 
     this.kodos.set(def.id, kodo);
   }
