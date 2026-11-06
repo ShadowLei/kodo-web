@@ -180,8 +180,8 @@ export function RulesPanel({ rules, onAdd, onUpdate, onRemove }: Props) {
               <p className="modal-hint">
                 Edit the kodo-core rule JSON. Rules run automatically on every
                 query and are written to the WebConsole through the{" "}
-                <code>web-console</code> channel. Point <code>$ns</code> at a
-                namespace from the result (for example <code>Payment</code>).
+                <code>web-console</code> channel. Point <code>$ns</code> at the
+                namespace you want to check (for example <code>Payment</code>).
               </p>
               <textarea
                 className={`rule-json-editor ${parsedEditor.valid ? "" : "invalid"}`}
