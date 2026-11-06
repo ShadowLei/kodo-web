@@ -146,15 +146,3 @@ export interface WebConsoleBatchDTO {
   title: string;
   messages: WebConsoleMessageDTO[];
 }
-
-/** Re-run the current rules against nodes already held by a result tab. */
-export interface CheckRulesRequestDTO {
-  networkId: string;
-  ns: string;
-  rules: NotificationRuleDTO[];
-  nodes: DataNodeDTO[];
-}
-
-export interface CheckRulesResponseDTO {
-  console?: WebConsoleBatchDTO;
-}

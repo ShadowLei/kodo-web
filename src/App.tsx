@@ -266,52 +266,31 @@ export default function App() {
     ? rulesByNetwork[activeNetworkId] ?? []
     : [];
 
-  const recheckRules = useCallback(
-    async (storedRules: StoredRule[]) => {
-      if (!activeNetworkId || !activeResult) return;
-      const { rules, warnings } = splitRulesForCheck(storedRules);
-      try {
-        const res = await server.checkRules({
-          networkId: activeNetworkId,
-          ns: activeResult.ns,
-          rules,
-          nodes: activeResult.nodes,
-        });
-        pushConsoleResult(
-          res.console,
-          warnings,
-          `Rules check · ${activeResult.ns} · ${activeResult.nodes.length} node(s)`,
-        );
-      } catch (e) {
-        setError(String(e));
-      }
-    },
-    [activeNetworkId, activeResult, server, pushConsoleResult],
-  );
-
   const addRule = useCallback(
     (raw: string) => {
       if (!activeNetworkId) return;
-      const next = [
-        ...(rulesByNetwork[activeNetworkId] ?? []),
-        { key: newRuleKey(), raw },
-      ];
-      setRulesByNetwork((prev) => ({ ...prev, [activeNetworkId]: next }));
-      void recheckRules(next);
+      setRulesByNetwork((prev) => ({
+        ...prev,
+        [activeNetworkId]: [
+          ...(prev[activeNetworkId] ?? []),
+          { key: newRuleKey(), raw },
+        ],
+      }));
     },
-    [activeNetworkId, rulesByNetwork, recheckRules],
+    [activeNetworkId],
   );
 
   const updateRule = useCallback(
     (key: string, raw: string) => {
       if (!activeNetworkId) return;
-      const next = (rulesByNetwork[activeNetworkId] ?? []).map((rule) =>
-        rule.key === key ? { ...rule, raw } : rule,
-      );
-      setRulesByNetwork((prev) => ({ ...prev, [activeNetworkId]: next }));
-      void recheckRules(next);
+      setRulesByNetwork((prev) => ({
+        ...prev,
+        [activeNetworkId]: (prev[activeNetworkId] ?? []).map((rule) =>
+          rule.key === key ? { ...rule, raw } : rule,
+        ),
+      }));
     },
-    [activeNetworkId, rulesByNetwork, recheckRules],
+    [activeNetworkId],
   );
 
   const removeRule = useCallback(
@@ -379,7 +358,7 @@ export default function App() {
                         </div>
                       </div>
                     )}
-                    {activeTab?.kind === "data" && activeResult && (
+                    {activeTab?.kind === "schema" && (
                       <RulesPanel
                         rules={activeRules}
                         onAdd={addRule}

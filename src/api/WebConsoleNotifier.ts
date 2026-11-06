@@ -11,9 +11,8 @@ const MAX_DETAIL_LINES = 8;
  * kodo-core calls `notify()` for every violated rule; the mock server also
  * calls it with an empty `violated` list for rules that passed, so a query
  * with healthy data still produces the `"<id> Exec Succeed"` line required by
- * the WebConsole. Messages are buffered and drained once per query/check
- * batch, which is what lets the UI draw one clearly separated block per
- * execution.
+ * the WebConsole. Messages are buffered and drained once per query batch,
+ * which is what lets the UI draw one clearly separated block per execution.
  */
 export class WebConsoleNotifier implements INotifier {
   readonly name = "web-console";

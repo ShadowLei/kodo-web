@@ -1,6 +1,4 @@
 import type {
-  CheckRulesRequestDTO,
-  CheckRulesResponseDTO,
   DataModelDTO,
   LookupRequestDTO,
   LookupResponseDTO,
@@ -32,10 +30,4 @@ export interface IKodoServer {
    * `kodo.checkRules()`, and the WebConsole output rides along in `console`.
    */
   lookup(req: LookupRequestDTO): Promise<LookupResponseDTO>;
-
-  /**
-   * Re-check rules against a result the UI already holds (for example right
-   * after a rule is added or edited), without running the lookup again.
-   */
-  checkRules(req: CheckRulesRequestDTO): Promise<CheckRulesResponseDTO>;
 }

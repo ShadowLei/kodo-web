@@ -1,5 +1,4 @@
 import {
-  DataNode as KodoDataNode,
   Kodo,
   MemoryProvider,
   NodeTranslator,
@@ -12,8 +11,6 @@ import {
 
 import type { IKodoServer } from "./IKodoServer";
 import type {
-  CheckRulesRequestDTO,
-  CheckRulesResponseDTO,
   DataModelDTO,
   DataNodeDTO,
   DataNodeRefDTO,
@@ -142,31 +139,12 @@ export class MockKodoServer implements IKodoServer {
       req.ns,
       req.rules ?? [],
       dataNodes,
-      "query",
     );
 
     return {
       nodes: dataNodes.map((dn) => this.toDataNodeDTO(dn)),
       console: consoleBatch,
     };
-  }
-
-  /** Re-check rules against result nodes the UI already holds. */
-  async checkRules(req: CheckRulesRequestDTO): Promise<CheckRulesResponseDTO> {
-    const kodo = this.kodos.get(req.networkId);
-    if (!kodo) {
-      throw new Error(`Network not found: ${req.networkId}`);
-    }
-
-    const nodes = req.nodes.map((node) => this.toKodoDataNode(node));
-    const consoleBatch = await this.runRuleChecks(
-      req.networkId,
-      req.ns,
-      req.rules,
-      nodes,
-      "check",
-    );
-    return { console: consoleBatch };
   }
 
   /* ------------------------------ helpers ------------------------------ */
@@ -183,8 +161,7 @@ export class MockKodoServer implements IKodoServer {
     networkId: string,
     ns: string,
     rules: NotificationRuleDTO[],
-    nodes: KodoDataNode<any>[],
-    kind: "query" | "check",
+    nodes: DataNode<any>[],
   ): Promise<WebConsoleBatchDTO | undefined> {
     const kodo = this.kodos.get(networkId);
     const webConsole = this.webConsoles.get(networkId);
@@ -211,20 +188,9 @@ export class MockKodoServer implements IKodoServer {
     return {
       id: `console-${++this.consoleSeq}`,
       at: new Date().toISOString(),
-      title:
-        kind === "query"
-          ? `Query ${ns} · ${nodes.length} node(s)`
-          : `Rules check · ${ns} · ${nodes.length} node(s)`,
+      title: `Query ${ns} · ${nodes.length} node(s)`,
       messages,
     };
-  }
-
-  private toKodoDataNode(node: DataNodeDTO): KodoDataNode<any> {
-    const kodoNode = new KodoDataNode<any>();
-    kodoNode.$ns = node.$ns;
-    kodoNode.$id = node.$id;
-    kodoNode.data = node.data;
-    return kodoNode;
   }
 
   private requireNetwork(id: string): NetworkDef {
