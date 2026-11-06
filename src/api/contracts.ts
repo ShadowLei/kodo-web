@@ -72,6 +72,8 @@ export interface LookupRequestDTO {
   ns: string;
   expression: QueryExpressionDTO;
   options: KodoOptionsDTO;
+  /** Rules to check against the query result (invalid rules never leave the UI). */
+  rules?: NotificationRuleDTO[];
 }
 
 /** A reference to another data node (used to reconstruct edges). */
@@ -103,4 +105,44 @@ export interface DataNodeDTO {
 
 export interface LookupResponseDTO {
   nodes: DataNodeDTO[];
+  /** WebConsole output produced while checking this query's rules. */
+  console?: WebConsoleBatchDTO;
+}
+
+/* ------------------------------------------------------------------ *
+ * kodo-core notification rules & the WebConsole channel.
+ * ------------------------------------------------------------------ */
+
+export type RuleExpectDTO = "all" | "any" | "none";
+
+/** A kodo-core `NotificationRule`, safe to send over the wire as JSON. */
+export interface NotificationRuleDTO {
+  id?: string;
+  description?: string;
+  active?: boolean;
+  $ns?: string;
+  expect: RuleExpectDTO;
+  match: QueryExpressionDTO;
+  notify?: {
+    channels?: string[];
+    message?: string;
+  };
+}
+
+export type WebConsoleLevel = "success" | "error" | "alert";
+
+/** One line written to the WebConsole by a notifier (or by the UI itself). */
+export interface WebConsoleMessageDTO {
+  level: WebConsoleLevel;
+  message: string;
+  /** Violating-node summaries shown under an error message. */
+  details?: string[];
+}
+
+/** All lines written during one rule-check execution. */
+export interface WebConsoleBatchDTO {
+  id: string;
+  at: string;
+  title: string;
+  messages: WebConsoleMessageDTO[];
 }

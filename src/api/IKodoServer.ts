@@ -24,6 +24,10 @@ export interface IKodoServer {
   /** Fetch the dynamic data model for a namespace within a network. */
   getDataModel(networkId: string, ns: string): Promise<DataModelDTO>;
 
-  /** Run a kodo lookup (explore) and return the resulting data-node network. */
+  /**
+   * Run a kodo lookup (explore) and return the resulting data-node network.
+   * Any `rules` in the request are checked against the result through
+   * `kodo.checkRules()`, and the WebConsole output rides along in `console`.
+   */
   lookup(req: LookupRequestDTO): Promise<LookupResponseDTO>;
 }
