@@ -159,6 +159,7 @@ export default function App() {
           $id: "query",
           data: { condition: node.sublabel ?? "(all)" },
           $from: [],
+          $to: [],
           $fromQuery: false,
         });
       }

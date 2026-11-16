@@ -83,17 +83,22 @@ export interface DataNodeRefDTO {
 }
 
 /**
- * A query result node. `$from` lists every node that produced it (its
- * `$fromQN[i].$fromDN`), so the result network edges can be rebuilt.
+ * A query result node. `$from` and `$to` mirror kodo-core 0.2.0's
+ * `DataNode.$from` / `DataNode.$to`, the direct DataNode neighbours of the
+ * node, so the result network edges can be rebuilt without walking the raw
+ * query-node path (`$fromQN`).
  *
- * kodo-core >= 0.1.8 keeps all query paths that reach a node, so a node may
- * have several parents (e.g. the same row reached through two links).
+ * A node may have several neighbours (e.g. the same row reached through two
+ * links), so both lists are de-duplicated references.
  */
 export interface DataNodeDTO {
   $ns: string;
   $id?: string | number;
   data: Record<string, unknown>;
+  /** Immediate parent DataNodes (kodo-core `DataNode.$from`). */
   $from: DataNodeRefDTO[];
+  /** Immediate child DataNodes (kodo-core `DataNode.$to`). */
+  $to: DataNodeRefDTO[];
   /**
    * True when the startup QueryNode returned this node directly (one of its
    * `$fromQN` entries has no `$fromDN`). Kept separately from `$from` so the
@@ -115,14 +120,29 @@ export interface LookupResponseDTO {
 
 export type RuleExpectDTO = "all" | "any" | "none";
 
-/** A kodo-core `NotificationRule`, safe to send over the wire as JSON. */
+/**
+ * kodo-core 0.2.0 `QueryMatch<T>`: the target namespace (optional), the
+ * quantifier, and the per-node predicate. It is the object form of
+ * `NotificationRule.matchExpression`.
+ */
+export interface QueryMatchDTO {
+  $ns?: string;
+  expect: RuleExpectDTO;
+  match: QueryExpressionDTO;
+}
+
+/**
+ * A kodo-core 0.2.0 `NotificationRule`, safe to send over the wire as JSON.
+ *
+ * `matchExpression` is either a CEL expression string (evaluated against
+ * `nodes`) or a `QueryMatchDTO` object. kodo-core 0.2.0 moved the old
+ * top-level `$ns` / `expect` / `match` fields into this node.
+ */
 export interface NotificationRuleDTO {
   id?: string;
   description?: string;
   active?: boolean;
-  $ns?: string;
-  expect: RuleExpectDTO;
-  match: QueryExpressionDTO;
+  matchExpression: QueryMatchDTO | string;
   notify?: {
     channels?: string[];
     message?: string;

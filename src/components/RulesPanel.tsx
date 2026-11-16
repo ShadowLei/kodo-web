@@ -178,10 +178,14 @@ export function RulesPanel({ rules, onAdd, onUpdate, onRemove }: Props) {
 
             <div className="modal-body">
               <p className="modal-hint">
-                Edit the kodo-core rule JSON. Rules run automatically on every
-                query and are written to the WebConsole through the{" "}
-                <code>web-console</code> channel. Point <code>$ns</code> at the
-                namespace you want to check (for example <code>Payment</code>).
+                Edit the kodo-core 0.2.0 rule JSON.{" "}
+                <code>matchExpression</code> is either a QueryMatch object or a
+                CEL string evaluated against <code>nodes</code> (each node
+                exposes <code>$from</code> / <code>$to</code>). Rules run
+                automatically on every query and are written to the WebConsole
+                through the <code>web-console</code> channel. Point{" "}
+                <code>matchExpression.$ns</code> at the namespace you want to
+                check (for example <code>Payment</code>).
               </p>
               <textarea
                 className={`rule-json-editor ${parsedEditor.valid ? "" : "invalid"}`}

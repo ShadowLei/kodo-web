@@ -5,7 +5,7 @@
     "": {
       "name": "kodo-web",
       "dependencies": {
-        "kodo-core": "^0.1.8",
+        "kodo-core": "^0.2.0",
         "konva": "^9.3.16",
         "react": "^18.3.1",
         "react-dom": "^18.3.1",
@@ -111,6 +111,8 @@
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "3.1.2", "@jridgewell/sourcemap-codec": "1.6.0" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
 
+    "@marcbachmann/cel-js": ["@marcbachmann/cel-js@8.0.0", "", { "bin": { "cel-evaluate": "bin/cel-evaluate.js" } }, "sha512-oaTrAziGr3zDLFiMt/yLU3nZuRMawyWQB5X1a0I7s9eGy3JYzX9l8ZXXHyMd64nzbeVFZTewuUShwsZQdK6UCA=="],
+
     "@oxc-project/types": ["@oxc-project/types@0.156.0", "", {}, "sha512-1Duyg48TdJNdyhEB8Xn1L36bT9Pv6GUtlKjHxOys8xkaF/rQq3XJE+bAurSK/AgIz5mGFsb77cn9Pb20+WCScw=="],
 
     "@rolldown/binding-android-arm-eabi": ["@rolldown/binding-android-arm-eabi@1.2.16", "", { "os": "android", "cpu": "arm" }, "sha512-ia3DwAs0OsMGS7+IConptSiyk9pEXkOx/AbJ2n/lAGxH3QkWQus1t8d7gnAT38FCU2sQu8lUbeR6AiZFv4JxaA=="],
@@ -209,6 +211,8 @@
 
     "detect-libc": ["detect-libc@2.1.2", "", {}, "sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ=="],
 
+    "devalue": ["devalue@6.0.3", "", {}, "sha512-3woMEITftG1wKeO/4d/QXH1DVKctTSZg3jNGPpjp9hNr5Hos8MCFF5McTML5ZtgKDObm2R591B0spRp2IVernA=="],
+
     "electron-to-chromium": ["electron-to-chromium@1.5.464", "", {}, "sha512-nRa65aFge40viPAKxMKULIY8tcXKwKboJWNn4RoKwyWXJ6SP7BnrDGKUTzc64818jIciH0PK7LSF8QzZes19GA=="],
 
     "emoji-regex": ["emoji-regex@10.6.0", "", {}, "sha512-toUI84YS5YmxW219erniWD0CIVOo46xGKColeNQRgOzDorgBi1v4D71/OFzgD9GO2UGKIv1C3Sp8DAn0+j5w7A=="],
@@ -231,9 +235,11 @@
 
     "jsesc": ["jsesc@3.1.0", "", { "bin": { "jsesc": "bin/jsesc" } }, "sha512-/sM3dO2FOzXjKQhJuo0Q173wf2KOo8t4I8vHy6lF9poUp7bKT0/NHE8fPX23PwfhnykfqnC2xRxOnVw5XuGIaA=="],
 
+    "json-decycle": ["json-decycle@4.0.0", "", {}, "sha512-3GFL/vWazCbMu1kw+NdIfAHh6Ugq5pxkKcSUnK1f/Fw1nDtt1i+BiBfRJs0iPEKscYAz4k4+osvgjY95hmuJXQ=="],
+
     "json5": ["json5@2.2.3", "", { "bin": { "json5": "lib/cli.js" } }, "sha512-XmOWe7eyHYH14cLdVPoyg+GOH3rYX++KpzrylJwSW98t3Nk+U8XOl8FWKOgwtzdb8lXGf6zYwDUzeHMWfxasyg=="],
 
-    "kodo-core": ["kodo-core@0.1.8", "", { "dependencies": { "@aws-sdk/client-dynamodb": "^3.1156.0", "@aws-sdk/lib-dynamodb": "^3.1156.0", "@types/pg": "^8.23.1", "pg": "^8.23.0", "typeorm": "^1.1.1" }, "peerDependencies": { "typescript": "^6" } }, "sha512-WKzWSdK6a+AOzVpL4Zsk/VUJNlkRjvt7N8DLNj7uuVSAf13pMYJIIYOalEwhsEy//wvzAr7DMFBpq3egFPHH4g=="],
+    "kodo-core": ["kodo-core@0.2.0", "", { "dependencies": { "@aws-sdk/client-dynamodb": "^3.1156.0", "@aws-sdk/lib-dynamodb": "^3.1156.0", "@marcbachmann/cel-js": "^8.0.0", "@types/pg": "^8.23.1", "devalue": "^6.0.3", "json-decycle": "^4.0.0", "pg": "^8.23.0", "typeorm": "^1.1.1" }, "peerDependencies": { "typescript": "^6" } }, "sha512-0+wum/bUAaiiyYHLMyUBghjMHTYSPPL9rPFnpTZRM2WlFCYbGWitzf2gdp6FwPoFVQBOUQ4GD+AxxQ2JM9k+fQ=="],
 
     "konva": ["konva@9.3.22", "", {}, "sha512-yQI5d1bmELlD/fowuyfOp9ff+oamg26WOCkyqUyc+nczD/lhRa3EvD2MZOoc4c1293TAubW9n34fSQLgSeEgSw=="],
 
