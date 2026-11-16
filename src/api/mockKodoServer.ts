@@ -1,5 +1,6 @@
 import {
   Kodo,
+  KodoNotifier,
   MemoryProvider,
   NodeTranslator,
   type DataNode,
@@ -57,26 +58,28 @@ interface NetworkDef {
 }
 
 /**
- * Normalize `DataNode.$fromQN` across kodo-core versions.
- *
- * 0.1.7 stored a single `QueryNode`; 0.1.8 changed it to `QueryNode[]`.
- * Accepting both keeps a stale install (new code, old dependency) from
- * throwing `TypeError: object is not iterable` at runtime.
+ * De-duplicate the DataNode neighbours kodo-core records on `$from` / `$to`.
+ * The same neighbour can be reached through more than one link, so the wire
+ * DTO keeps one reference per target node.
  */
-function recordedQueryNodes(dn: DataNode<unknown>): QueryNode<unknown>[] {
-  const qn = dn.$fromQN as unknown as
-    | QueryNode<unknown>
-    | QueryNode<unknown>[]
-    | null
-    | undefined;
-  if (!qn) return [];
-  return Array.isArray(qn) ? qn : [qn];
+function nodeRefs(nodes: DataNode<unknown>[]): DataNodeRefDTO[] {
+  const seen = new Set<string>();
+  const refs: DataNodeRefDTO[] = [];
+  for (const node of nodes) {
+    const key = `${node.$ns}.${String(node.$id)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    refs.push({ $ns: node.$ns, $id: node.$id });
+  }
+  return refs;
 }
 
 export class MockKodoServer implements IKodoServer {
   private readonly networkDefs = new Map<string, NetworkDef>();
   private readonly kodos = new Map<string, Kodo>();
-  /** One WebConsole sink per Kodo instance, registered by default. */
+  /** One evaluation/notification engine per Kodo instance. */
+  private readonly notifiers = new Map<string, KodoNotifier>();
+  /** One WebConsole sink per Kodo instance, registered with its notifier. */
   private readonly webConsoles = new Map<string, WebConsoleNotifier>();
   private consoleSeq = 0;
 
@@ -153,8 +156,9 @@ export class MockKodoServer implements IKodoServer {
    * Run kodo-core's notification engine and collect the `web-console`
    * channel's output into one batch.
    *
-   * kodo-core only invokes notifiers for violations, so a rule that passed is
-   * reported to the notifier explicitly here. That keeps the success line
+   * kodo-core 0.2.0 evaluates rules through `KodoNotifier.validate()` and only
+   * calls `notify()` for violated rules, so a rule that passed is reported to
+   * the notifier explicitly here. That keeps the success line
    * (`"<id> Exec Succeed"`) in the same batch as the failures.
    */
   private async runRuleChecks(
@@ -163,9 +167,9 @@ export class MockKodoServer implements IKodoServer {
     rules: NotificationRuleDTO[],
     nodes: DataNode<any>[],
   ): Promise<WebConsoleBatchDTO | undefined> {
-    const kodo = this.kodos.get(networkId);
+    const notifier = this.notifiers.get(networkId);
     const webConsole = this.webConsoles.get(networkId);
-    if (!kodo || !webConsole) {
+    if (!notifier || !webConsole) {
       throw new Error(`Notifiers are not registered for network: ${networkId}`);
     }
 
@@ -173,11 +177,14 @@ export class MockKodoServer implements IKodoServer {
     if (rules.length === 0) return undefined;
 
     const activeRules = rules.filter((rule) => rule.active !== false);
-    const violations = await kodo.checkRules(activeRules as NotificationRule[], nodes);
+    const violations = await notifier.validate(
+      activeRules as NotificationRule[],
+      nodes,
+    );
     const violatedRules = new Set(violations.map((violation) => violation.rule));
 
     for (const rule of activeRules) {
-      if (violatedRules.has(rule)) continue;
+      if (violatedRules.has(rule as NotificationRule)) continue;
       if (!rule.notify?.channels?.includes(webConsole.name)) continue;
       await webConsole.notify(rule as NotificationRule, []);
     }
@@ -216,29 +223,23 @@ export class MockKodoServer implements IKodoServer {
   }
 
   private toDataNodeDTO(dn: DataNode<unknown>): DataNodeDTO {
-    // kodo-core >= 0.1.8 keeps every query path that reached this node, so a
-    // node can have several parents. A query node without `$fromDN` is the
-    // startup query: it contributes no data-node parent, but marks the node
-    // as a direct query result.
-    const seen = new Set<string>();
-    const from: DataNodeRefDTO[] = [];
+    // kodo-core >= 0.1.9 records direct DataNode neighbours on `$from` / `$to`,
+    // so the wire DTO no longer has to walk the raw query-node path. `$fromQN`
+    // is still the only record of whether the startup QueryNode returned this
+    // node directly: that entry has no `$fromDN`.
     let fromQuery = false;
-    for (const qn of recordedQueryNodes(dn)) {
-      const parent = qn?.$fromDN;
-      if (!parent) {
+    for (const qn of dn.$fromQN) {
+      if (!qn?.$fromDN) {
         fromQuery = true;
-        continue;
+        break;
       }
-      const key = `${parent.$ns}.${String(parent.$id)}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      from.push({ $ns: parent.$ns, $id: parent.$id });
     }
     return {
       $ns: dn.$ns,
       $id: dn.$id,
       data: (dn.data ?? {}) as Record<string, unknown>,
-      $from: from,
+      $from: nodeRefs(dn.$from),
+      $to: nodeRefs(dn.$to),
       $fromQuery: fromQuery,
     };
   }
@@ -269,7 +270,11 @@ export class MockKodoServer implements IKodoServer {
     kodo.registerProvider("*", provider);
 
     const webConsole = new WebConsoleNotifier();
-    kodo.registerNotifier(webConsole);
+    // kodo-core 0.2.0 separated rule evaluation/notification from Kodo:
+    // the notifier owns the sinks and `validate()` drives them.
+    const notifier = new KodoNotifier();
+    notifier.registerNotifier(webConsole);
+    this.notifiers.set(def.id, notifier);
     this.webConsoles.set(def.id, webConsole);
 
     this.kodos.set(def.id, kodo);

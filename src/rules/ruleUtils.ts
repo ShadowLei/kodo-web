@@ -23,15 +23,19 @@ const RULE_EXPECTS = new Set(["all", "any", "none"]);
 /**
  * The starter rule from the issue, made valid JSON.
  * `$ns` is intentionally a placeholder: the user points it at the namespace
- * they want to check (`Payment`, `Order`, …).
+ * they want to check (`Payment`, `Order`, …). kodo-core 0.2.0 wraps the
+ * namespace, quantifier and predicate in `matchExpression`; that field also
+ * accepts a CEL expression string instead of this object.
  */
 const DEFAULT_RULE = {
   id: "Test-1",
   description: "Shadow Test Rule",
   active: true,
-  $ns: "TODO",
-  expect: "all",
-  match: { amount: { $op: ">=", $val: 1000 } },
+  matchExpression: {
+    $ns: "TODO",
+    expect: "all",
+    match: { amount: { $op: ">=", $val: 1000 } },
+  },
   notify: {
     channels: ["web-console"],
     message: "测试失败-Custom",
@@ -88,9 +92,8 @@ export function parseRule(raw: string): ParsedRule {
       description:
         typeof record.description === "string" ? record.description : undefined,
       active: typeof record.active === "boolean" ? record.active : undefined,
-      $ns: typeof record.$ns === "string" ? record.$ns : undefined,
-      expect: record.expect as NotificationRuleDTO["expect"],
-      match: record.match as NotificationRuleDTO["match"],
+      matchExpression:
+        record.matchExpression as NotificationRuleDTO["matchExpression"],
       notify: record.notify
         ? {
             channels: (record.notify as { channels?: string[] }).channels,
@@ -134,17 +137,45 @@ export function splitRulesForCheck(stored: StoredRule[]): {
 }
 
 function validateRule(record: Record<string, unknown>): string | undefined {
-  if (!RULE_EXPECTS.has(String(record.expect))) {
-    return '`expect` must be "all", "any" or "none".';
+  const matchExpression = record.matchExpression;
+  if (matchExpression === undefined) {
+    if (record.match !== undefined || record.expect !== undefined) {
+      return "kodo-core 0.2.0 moved `expect` / `match` under `matchExpression`.";
+    }
+    return "`matchExpression` is required.";
   }
-  if (
-    !record.match ||
-    typeof record.match !== "object" ||
-    Array.isArray(record.match)
+
+  if (typeof matchExpression === "string") {
+    if (!matchExpression.trim()) {
+      return "`matchExpression` CEL expression must not be empty.";
+    }
+  } else if (
+    !matchExpression ||
+    typeof matchExpression !== "object" ||
+    Array.isArray(matchExpression)
   ) {
-    return "`match` must be a JSON object.";
+    return "`matchExpression` must be a CEL string or a QueryMatch object.";
+  } else {
+    const queryMatch = matchExpression as Record<string, unknown>;
+    if (!RULE_EXPECTS.has(String(queryMatch.expect))) {
+      return '`matchExpression.expect` must be "all", "any" or "none".';
+    }
+    if (
+      !queryMatch.match ||
+      typeof queryMatch.match !== "object" ||
+      Array.isArray(queryMatch.match)
+    ) {
+      return "`matchExpression.match` must be a JSON object.";
+    }
+    if (
+      queryMatch.$ns !== undefined &&
+      typeof queryMatch.$ns !== "string"
+    ) {
+      return "`matchExpression.$ns` must be a string.";
+    }
   }
-  for (const key of ["id", "description", "$ns"]) {
+
+  for (const key of ["id", "description"]) {
     if (record[key] !== undefined && typeof record[key] !== "string") {
       return `\`${key}\` must be a string.`;
     }

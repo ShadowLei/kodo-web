@@ -189,14 +189,21 @@ export function buildDataGraph(nodes: DataNodeDTO[], query?: QueryInfo): Graph {
   });
 
   const edges: GraphEdge[] = [];
+  const edgeIds = new Set<string>();
+  const addEdge = (from: string, to: string) => {
+    if (!nodeIds.has(from) || !nodeIds.has(to)) return;
+    const id = `${from}->${to}`;
+    if (edgeIds.has(id)) return;
+    edgeIds.add(id);
+    edges.push({ id, from, to });
+  };
   nodes.forEach((n) => {
-    uniqueParentIds(n, nodeIds).forEach((pid) => {
-      edges.push({
-        id: `${pid}->${idOf(n)}`,
-        from: pid,
-        to: idOf(n),
-      });
-    });
+    const id = idOf(n);
+    // kodo-core 0.2.0 keeps direct DataNode neighbours on `$from` / `$to`.
+    // Use both sides so an edge survives even if only one direction was
+    // recorded, and de-duplicate by its id.
+    uniqueParentIds(n, nodeIds).forEach((pid) => addEdge(pid, id));
+    n.$to.forEach((child) => addEdge(id, idOf(child)));
   });
 
   // Connect the startup QueryNode to the nodes it returned directly.
