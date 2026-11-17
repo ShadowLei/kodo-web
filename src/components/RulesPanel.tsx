@@ -1,16 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
 
+import type { DataModelDTO } from "@/api/contracts";
 import {
   defaultRuleJson,
   parseRule,
   ruleStatus,
+  type RuleDraft,
+  type RuleEditorMode,
   type StoredRule,
 } from "@/rules/ruleUtils";
+import { DeepSeekAssist } from "@/components/DeepSeekAssist";
 
 interface Props {
   rules: StoredRule[];
-  onAdd: (raw: string) => void;
-  onUpdate: (key: string, raw: string) => void;
+  dataModels?: readonly DataModelDTO[];
+  onAdd: (draft: RuleDraft) => void;
+  onUpdate: (key: string, draft: RuleDraft) => void;
   onRemove: (key: string) => void;
 }
 
@@ -24,20 +29,32 @@ const STATUS_LABEL = {
   active: "Active rule",
 } as const;
 
-export function RulesPanel({ rules, onAdd, onUpdate, onRemove }: Props) {
+export function RulesPanel({
+  rules,
+  dataModels,
+  onAdd,
+  onUpdate,
+  onRemove,
+}: Props) {
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [editorText, setEditorText] = useState("");
+  const [mode, setMode] = useState<RuleEditorMode>("custom");
+  const [prompt, setPrompt] = useState("");
   const [confirmingKey, setConfirmingKey] = useState<string | null>(null);
 
   const openAdd = () => {
     setEditor({});
     setEditorText(defaultRuleJson());
+    setMode("custom");
+    setPrompt("");
     setConfirmingKey(null);
   };
 
   const openEdit = (rule: StoredRule) => {
     setEditor({ key: rule.key });
     setEditorText(rule.raw);
+    setMode(rule.mode ?? "custom");
+    setPrompt(rule.prompt ?? "");
     setConfirmingKey(null);
   };
 
@@ -45,8 +62,9 @@ export function RulesPanel({ rules, onAdd, onUpdate, onRemove }: Props) {
 
   const saveEditor = () => {
     if (!editor) return;
-    if (editor.key) onUpdate(editor.key, editorText);
-    else onAdd(editorText);
+    const draft: RuleDraft = { raw: editorText, mode, prompt };
+    if (editor.key) onUpdate(editor.key, draft);
+    else onAdd(draft);
     setEditor(null);
   };
 
@@ -177,22 +195,74 @@ export function RulesPanel({ rules, onAdd, onUpdate, onRemove }: Props) {
             </div>
 
             <div className="modal-body">
-              <p className="modal-hint">
-                Edit the kodo-core 0.2.0 rule JSON.{" "}
-                <code>matchExpression</code> is either a QueryMatch object or a
-                CEL string evaluated against <code>nodes</code> (each node
-                exposes <code>$from</code> / <code>$to</code>). Rules run
-                automatically on every query and are written to the WebConsole
-                through the <code>web-console</code> channel. Point{" "}
-                <code>matchExpression.$ns</code> at the namespace you want to
-                check (for example <code>Payment</code>).
-              </p>
+              <div className="rule-mode" role="radiogroup" aria-label="Rule authoring mode">
+                <label className={`rule-mode-option ${mode === "custom" ? "selected" : ""}`}>
+                  <input
+                    type="radio"
+                    name="rule-authoring-mode"
+                    value="custom"
+                    checked={mode === "custom"}
+                    onChange={() => setMode("custom")}
+                  />
+                  <span className="rule-mode-copy">
+                    <span className="rule-mode-name">Custom</span>
+                    <span className="rule-mode-desc">
+                      Write the rule JSON and matchExpression yourself.
+                    </span>
+                  </span>
+                </label>
+                <label
+                  className={`rule-mode-option ${mode === "deepseek" ? "selected" : ""}`}
+                >
+                  <input
+                    type="radio"
+                    name="rule-authoring-mode"
+                    value="deepseek"
+                    checked={mode === "deepseek"}
+                    onChange={() => setMode("deepseek")}
+                  />
+                  <span className="rule-mode-copy">
+                    <span className="rule-mode-name">DeepSeek</span>
+                    <span className="rule-mode-desc">
+                      Describe the condition in plain text and generate the rule.
+                    </span>
+                  </span>
+                </label>
+              </div>
+
+              {mode === "deepseek" ? (
+                <DeepSeekAssist
+                  prompt={prompt}
+                  onPromptChange={setPrompt}
+                  currentRule={editorText}
+                  dataModels={dataModels}
+                  onGenerated={setEditorText}
+                />
+              ) : (
+                <p className="modal-hint">
+                  Edit the kodo-core 0.2.0 rule JSON.{" "}
+                  <code>matchExpression</code> is either a QueryMatch object or a
+                  CEL string evaluated against <code>nodes</code> (each node
+                  exposes <code>$from</code> / <code>$to</code>). Rules run
+                  automatically on every query and are written to the WebConsole
+                  through the <code>web-console</code> channel. Point{" "}
+                  <code>matchExpression.$ns</code> at the namespace you want to
+                  check (for example <code>Payment</code>).
+                </p>
+              )}
+
+              {mode === "deepseek" && (
+                <p className="modal-hint deepseek-output-hint">
+                  The generated rule JSON appears below — the same editor Custom
+                  mode uses. Review it before saving.
+                </p>
+              )}
               <textarea
                 className={`rule-json-editor ${parsedEditor.valid ? "" : "invalid"}`}
                 value={editorText}
                 onChange={(event) => setEditorText(event.target.value)}
                 spellCheck={false}
-                autoFocus
+                autoFocus={mode === "custom"}
                 aria-label="Rule JSON"
               />
               {parsedEditor.valid ? (

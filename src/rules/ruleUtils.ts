@@ -1,10 +1,24 @@
 import type { NotificationRuleDTO, WebConsoleMessageDTO } from "@/api/contracts";
 
+/** How the rule was authored in the editor (restored when reopened). */
+export type RuleEditorMode = "custom" | "deepseek";
+
 /** A rule exactly as the user sees it in the JSON editor. */
 export interface StoredRule {
   key: string;
   /** Raw JSON, kept even while invalid so it can be edited again. */
   raw: string;
+  /** Last editor mode, so editing reopens in the same mode. */
+  mode?: RuleEditorMode;
+  /** Last DeepSeek prompt, kept so editing does not clear it. */
+  prompt?: string;
+}
+
+/** The parts of a rule the editor owns when adding or saving one. */
+export interface RuleDraft {
+  raw: string;
+  mode?: RuleEditorMode;
+  prompt?: string;
 }
 
 export interface ParsedRule {

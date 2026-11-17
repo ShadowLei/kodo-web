@@ -591,6 +591,210 @@ body {
   font-size: 11.5px;
 }
 
+/* ---------------- rule authoring mode / DeepSeek ---------------- */
+.rule-mode {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.rule-mode-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fffef9;
+  cursor: pointer;
+}
+
+.rule-mode-option.selected {
+  border-color: var(--accent);
+  background: #fdf1ec;
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.rule-mode-option input[type="radio"] {
+  margin: 2px 0 0;
+  accent-color: var(--accent);
+}
+
+.rule-mode-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rule-mode-name {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.rule-mode-desc {
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+.deepseek-assist {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fbf7ed;
+}
+
+.deepseek-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.deepseek-label-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.deepseek-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.deepseek-badge {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #eee2cf;
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.deepseek-key-saved,
+.deepseek-key-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.deepseek-key-mask {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fffefb;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 2px;
+  white-space: nowrap;
+}
+
+.deepseek-key-input input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.deepseek-key-input input:focus,
+.deepseek-prompt:focus {
+  border-color: var(--accent);
+  outline: 2px solid rgba(231, 111, 81, 0.25);
+  outline-offset: 0;
+}
+
+.deepseek-prompt {
+  width: 100%;
+  min-height: 64px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.deepseek-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.deepseek-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+.deepseek-actions .deepseek-hint {
+  flex: 1;
+  min-width: 180px;
+}
+
+.deepseek-status {
+  padding: 7px 9px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+.deepseek-status.error {
+  border: 1px solid #e8c0b9;
+  background: #fdf1ef;
+  color: #a94a40;
+}
+
+.deepseek-status.ok {
+  border: 1px solid #c6e0cd;
+  background: #eef7f0;
+  color: #34795a;
+}
+
+.deepseek-output-hint {
+  margin: 10px 0 8px;
+}
+
+.btn-small {
+  padding: 5px 10px;
+  border-radius: 5px;
+  font-size: 12px;
+}
+
+.btn.danger {
+  border-color: #dca8a2;
+  background: #fff0ee;
+  color: #b74b44;
+}
+
+.btn.danger:hover {
+  background: #ffe3df;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* ---------------- web console ---------------- */
 .web-console {
   position: relative;
