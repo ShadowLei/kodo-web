@@ -79,7 +79,7 @@ export function RulesPanel({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [editor, editorText]);
+  }, [editor, editorText, mode, prompt]);
 
   const parsedEditor = useMemo(() => parseRule(editorText), [editorText]);
 
