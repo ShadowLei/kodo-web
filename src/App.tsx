@@ -24,6 +24,7 @@ import { WebConsolePanel } from "@/components/WebConsolePanel";
 import {
   newRuleKey,
   splitRulesForCheck,
+  type RuleDraft,
   type StoredRule,
 } from "@/rules/ruleUtils";
 
@@ -268,13 +269,13 @@ export default function App() {
     : [];
 
   const addRule = useCallback(
-    (raw: string) => {
+    (draft: RuleDraft) => {
       if (!activeNetworkId) return;
       setRulesByNetwork((prev) => ({
         ...prev,
         [activeNetworkId]: [
           ...(prev[activeNetworkId] ?? []),
-          { key: newRuleKey(), raw },
+          { key: newRuleKey(), ...draft },
         ],
       }));
     },
@@ -282,12 +283,12 @@ export default function App() {
   );
 
   const updateRule = useCallback(
-    (key: string, raw: string) => {
+    (key: string, draft: RuleDraft) => {
       if (!activeNetworkId) return;
       setRulesByNetwork((prev) => ({
         ...prev,
         [activeNetworkId]: (prev[activeNetworkId] ?? []).map((rule) =>
-          rule.key === key ? { ...rule, raw } : rule,
+          rule.key === key ? { ...rule, ...draft } : rule,
         ),
       }));
     },
@@ -362,6 +363,11 @@ export default function App() {
                     {activeTab?.kind === "schema" && (
                       <RulesPanel
                         rules={activeRules}
+                        dataModels={
+                          activeNetworkId
+                            ? networkCache.get(activeNetworkId)?.dataModels
+                            : undefined
+                        }
                         onAdd={addRule}
                         onUpdate={updateRule}
                         onRemove={removeRule}
